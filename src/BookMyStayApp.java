@@ -1,4 +1,5 @@
-import java.util.Scanner;
+import java.util.HashMap;
+import java.util.Map;
 
 abstract class Room {
     private int numberOfBeds;
@@ -46,65 +47,62 @@ class SuiteRoom extends Room {
     public String getRoomType() { return "Suite Room"; }
 }
 
+// Version: 3.0
+class RoomInventory {
+    /**
+     * Stores available room count for each room type.
+     * Key   -> Room type name
+     * Value -> Available room count
+     */
+    private Map<String, Integer> roomAvailability;
+
+    /**
+     * Constructor initializes the inventory
+     * with default availability values.
+     */
+    public RoomInventory() {
+        roomAvailability = new HashMap<>();
+        initializeInventory();
+    }
+
+    /**
+     * Initializes room availability data.
+     * This method centralizes inventory setup
+     * instead of using scattered variables.
+     */
+    private void initializeInventory() {
+        roomAvailability.put("Single Room", 5);
+        roomAvailability.put("Double Room", 3);
+        roomAvailability.put("Suite Room", 2);
+    }
+
+    /**
+     * Returns the current availability map.
+     * @return map of room type to available count
+     */
+    public Map<String, Integer> getRoomAvailability() { return roomAvailability; }
+
+    /**
+     * Updates availability for a specific room type.
+     * @param roomType the room type to update
+     * @param count    new availability count
+     */
+    public void updateAvailability(String roomType, int count) {
+        roomAvailability.put(roomType, count);
+    }
+}
+
 public class BookMyStayApp {
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
+        Room[] rooms = { new SingleRoom(), new DoubleRoom(), new SuiteRoom() };
+        RoomInventory inventory = new RoomInventory();
 
-        Room singleRoom = new SingleRoom();
-        Room doubleRoom = new DoubleRoom();
-        Room suiteRoom = new SuiteRoom();
+        System.out.println("Hotel Room Inventory");
 
-        int singleAvailable = 5;
-        int doubleAvailable = 3;
-        int suiteAvailable = 2;
-
-        System.out.println("Welcome to BookMyStay!");
-        System.out.println("Available Rooms:");
-        System.out.println("1. Single Room");
-        System.out.println("2. Double Room");
-        System.out.println("3. Suite Room");
-        System.out.print("Choose a room type (1-3): ");
-        int choice = scanner.nextInt();
-
-        Room selectedRoom = null;
-        int available = 0;
-        switch (choice) {
-            case 1:
-                selectedRoom = singleRoom;
-                available = singleAvailable;
-                break;
-            case 2:
-                selectedRoom = doubleRoom;
-                available = doubleAvailable;
-                break;
-            case 3:
-                selectedRoom = suiteRoom;
-                available = suiteAvailable;
-                break;
-            default:
-                System.out.println("Invalid choice.");
-                return;
+        for (int i = 0; i < rooms.length; i++) {
+            if (i > 0) System.out.println();
+            rooms[i].displayDetails();
+            System.out.println("Available: " + inventory.getRoomAvailability().get(rooms[i].getRoomType()));
         }
-
-        if (available > 0) {
-            selectedRoom.displayDetails();
-            System.out.println("Available: " + available);
-            System.out.print("How many nights? ");
-            int nights = scanner.nextInt();
-            double total = selectedRoom.getPricePerNight() * nights;
-            System.out.println("Total cost: " + total);
-            System.out.print("Confirm booking? (yes/no): ");
-            String confirm = scanner.next();
-            if (confirm.equalsIgnoreCase("yes")) {
-                System.out.println("Booking confirmed!");
-                // Here you could decrement available, but for simplicity, just print
-            } else {
-                System.out.println("Booking cancelled.");
-            }
-        } else {
-            System.out.println("No rooms available.");
-        }
-
-        scanner.close();
     }
 }
