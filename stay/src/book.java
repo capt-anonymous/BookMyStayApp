@@ -1,145 +1,100 @@
+import java.util.LinkedList;
+import java.util.Queue;
 
-import java.util.*;
+class RoomInventory {
+    private int availableRooms;
 
-class Reservation {
-    private String reservationId;
-    private String guestName;
-    private String roomType;
-    private double baseCost;
+    public RoomInventory(int initialCount) {
+        this.availableRooms = initialCount;
+    }
 
-    public Reservation(String reservationId, String guestName, String roomType, double baseCost) {
-        this.reservationId = reservationId;
+    public synchronized boolean tryBookRoom(String guestName) {
+        if (availableRooms > 0) {
+            System.out.println("[PROCESSING] Thread " + Thread.currentThread().getName() + " for " + guestName + ": Room available. Allocating...");
+            
+            try { Thread.sleep(100); } catch (InterruptedException e) {}
+
+            availableRooms--;
+            System.out.println("[SUCCESS] Room allocated to " + guestName + ". Rooms left: " + availableRooms);
+            return true;
+        } else {
+            System.out.println("[FAILED] Room unavailable for " + guestName + ". Inventory empty.");
+            return false;
+        }
+    }
+
+    public int getAvailableRooms() {
+        return availableRooms;
+    }
+}
+
+class BookingRequest {
+    String guestName;
+
+    public BookingRequest(String guestName) {
         this.guestName = guestName;
-        this.roomType = roomType;
-        this.baseCost = baseCost;
     }
+}
 
-    public String getReservationId() {
-        return reservationId;
-    }
+class BookingProcessor extends Thread {
+    private final Queue<BookingRequest> requestQueue;
+    private final RoomInventory inventory;
 
-    public String getGuestName() {
-        return guestName;
-    }
-
-    public String getRoomType() {
-        return roomType;
-    }
-
-    public double getBaseCost() {
-        return baseCost;
+    public BookingProcessor(String threadName, Queue<BookingRequest> queue, RoomInventory inventory) {
+        super(threadName);
+        this.requestQueue = queue;
+        this.inventory = inventory;
     }
 
     @Override
-    public String toString() {
-        return "Reservation ID: " + reservationId +
-                ", Guest: " + guestName +
-                ", Room Type: " + roomType +
-                ", Base Cost: " + baseCost;
-    }
-}
+    public void run() {
+        while (true) {
+            BookingRequest request = null;
 
-class AddOnService {
-    private String serviceId;
-    private String serviceName;
-    private double serviceCost;
+            synchronized (requestQueue) {
+                if (!requestQueue.isEmpty()) {
+                    request = requestQueue.poll();
+                } else {
+                    break;
+                }
+            }
 
-    public AddOnService(String serviceId, String serviceName, double serviceCost) {
-        this.serviceId = serviceId;
-        this.serviceName = serviceName;
-        this.serviceCost = serviceCost;
-    }
-
-    public String getServiceId() {
-        return serviceId;
-    }
-
-    public String getServiceName() {
-        return serviceName;
-    }
-
-    public double getServiceCost() {
-        return serviceCost;
-    }
-
-    @Override
-    public String toString() {
-        return serviceName + " (ID: " + serviceId + ", Cost: " + serviceCost + ")";
-    }
-}
-
-class AddOnServiceManager {
-    private Map<String, List<AddOnService>> reservationServicesMap;
-
-    public AddOnServiceManager() {
-        reservationServicesMap = new HashMap<>();
-    }
-
-    public void addServiceToReservation(String reservationId, AddOnService service) {
-        reservationServicesMap.putIfAbsent(reservationId, new ArrayList<>());
-        reservationServicesMap.get(reservationId).add(service);
-    }
-
-    public void addMultipleServicesToReservation(String reservationId, List<AddOnService> services) {
-        reservationServicesMap.putIfAbsent(reservationId, new ArrayList<>());
-        reservationServicesMap.get(reservationId).addAll(services);
-    }
-
-    public List<AddOnService> getServicesForReservation(String reservationId) {
-        return reservationServicesMap.getOrDefault(reservationId, new ArrayList<>());
-    }
-
-    public double calculateAdditionalCost(String reservationId) {
-        double total = 0;
-        List<AddOnService> services = reservationServicesMap.getOrDefault(reservationId, new ArrayList<>());
-
-        for (AddOnService service : services) {
-            total += service.getServiceCost();
-        }
-
-        return total;
-    }
-
-    public double calculateFinalCost(Reservation reservation) {
-        return reservation.getBaseCost() + calculateAdditionalCost(reservation.getReservationId());
-    }
-
-    public void displayServicesForReservation(String reservationId) {
-        List<AddOnService> services = getServicesForReservation(reservationId);
-
-        if (services.isEmpty()) {
-            System.out.println("No add-on services selected for reservation " + reservationId);
-            return;
-        }
-
-        System.out.println("Add-on services for reservation " + reservationId + ":");
-        for (AddOnService service : services) {
-            System.out.println(service);
+            if (request != null) {
+                inventory.tryBookRoom(request.guestName);
+            }
         }
     }
 }
 
-public class book {
-    public static void main(String[] args) {
-        Reservation reservation1 = new Reservation("R101", "Sri", "Deluxe", 5000.0);
+public class UseCase11ConcurrentBookingSimulation {
+    public static void main(String[] args) throws InterruptedException {
+        System.out.println("=== Use Case 11: Concurrent Booking (Thread Safety) ===");
+        
+        RoomInventory sharedInventory = new RoomInventory(3);
+        Queue<BookingRequest> sharedQueue = new LinkedList<>();
 
-        AddOnService breakfast = new AddOnService("S01", "Breakfast", 500.0);
-        AddOnService airportPickup = new AddOnService("S02", "Airport Pickup", 1200.0);
-        AddOnService spa = new AddOnService("S03", "Spa Access", 1500.0);
+        sharedQueue.add(new BookingRequest("Alice"));
+        sharedQueue.add(new BookingRequest("Bob"));
+        sharedQueue.add(new BookingRequest("Charlie"));
+        sharedQueue.add(new BookingRequest("Diana"));
+        sharedQueue.add(new BookingRequest("Eve"));
 
-        AddOnServiceManager serviceManager = new AddOnServiceManager();
+        System.out.println("Initial Inventory: " + sharedInventory.getAvailableRooms() + " rooms.");
+        System.out.println("Total Requests: " + sharedQueue.size());
+        System.out.println("--------------------------------------------------\n");
 
-        serviceManager.addServiceToReservation("R101", breakfast);
-        serviceManager.addServiceToReservation("R101", airportPickup);
-        serviceManager.addServiceToReservation("R101", spa);
+        BookingProcessor thread1 = new BookingProcessor("Processor-1", sharedQueue, sharedInventory);
+        BookingProcessor thread2 = new BookingProcessor("Processor-2", sharedQueue, sharedInventory);
 
-        System.out.println(reservation1);
-        serviceManager.displayServicesForReservation("R101");
+        thread1.start();
+        thread2.start();
 
-        double additionalCost = serviceManager.calculateAdditionalCost("R101");
-        double finalCost = serviceManager.calculateFinalCost(reservation1);
+        thread1.join();
+        thread2.join();
 
-        System.out.println("Total Additional Cost: " + additionalCost);
-        System.out.println("Final Reservation Cost: " + finalCost);
+        System.out.println("\n--------------------------------------------------");
+        System.out.println("Final System State:");
+        System.out.println("Final Room Count: " + sharedInventory.getAvailableRooms());
+        System.out.println("All threads finished. No double-bookings occurred.");
     }
 }
