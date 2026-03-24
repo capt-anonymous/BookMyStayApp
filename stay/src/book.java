@@ -1,145 +1,115 @@
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
-import java.util.*;
-
+// 1. Core Model: Represents a confirmed booking
 class Reservation {
     private String reservationId;
     private String guestName;
-    private String roomType;
-    private double baseCost;
+    private double price;
 
-    public Reservation(String reservationId, String guestName, String roomType, double baseCost) {
+    public Reservation(String reservationId, String guestName, double price) {
         this.reservationId = reservationId;
         this.guestName = guestName;
-        this.roomType = roomType;
-        this.baseCost = baseCost;
+        this.price = price;
     }
 
-    public String getReservationId() {
-        return reservationId;
-    }
-
-    public String getGuestName() {
-        return guestName;
-    }
-
-    public String getRoomType() {
-        return roomType;
-    }
-
-    public double getBaseCost() {
-        return baseCost;
+    public double getPrice() {
+        return price;
     }
 
     @Override
     public String toString() {
-        return "Reservation ID: " + reservationId +
-                ", Guest: " + guestName +
-                ", Room Type: " + roomType +
-                ", Base Cost: " + baseCost;
+        return "Reservation ID: " + reservationId + " | Guest: " + guestName + " | Price: $" + price;
     }
 }
 
-class AddOnService {
-    private String serviceId;
-    private String serviceName;
-    private double serviceCost;
+// 2. Booking History: Focuses ONLY on storing data in insertion order
+class BookingHistory {
+    // List Data Structure used to preserve insertion order
+    private final List<Reservation> history;
 
-    public AddOnService(String serviceId, String serviceName, double serviceCost) {
-        this.serviceId = serviceId;
-        this.serviceName = serviceName;
-        this.serviceCost = serviceCost;
+    public BookingHistory() {
+        this.history = new ArrayList<>();
     }
 
-    public String getServiceId() {
-        return serviceId;
-    }
-
-    public String getServiceName() {
-        return serviceName;
-    }
-
-    public double getServiceCost() {
-        return serviceCost;
-    }
-
-    @Override
-    public String toString() {
-        return serviceName + " (ID: " + serviceId + ", Cost: " + serviceCost + ")";
-    }
-}
-
-class AddOnServiceManager {
-    private Map<String, List<AddOnService>> reservationServicesMap;
-
-    public AddOnServiceManager() {
-        reservationServicesMap = new HashMap<>();
-    }
-
-    public void addServiceToReservation(String reservationId, AddOnService service) {
-        reservationServicesMap.putIfAbsent(reservationId, new ArrayList<>());
-        reservationServicesMap.get(reservationId).add(service);
-    }
-
-    public void addMultipleServicesToReservation(String reservationId, List<AddOnService> services) {
-        reservationServicesMap.putIfAbsent(reservationId, new ArrayList<>());
-        reservationServicesMap.get(reservationId).addAll(services);
-    }
-
-    public List<AddOnService> getServicesForReservation(String reservationId) {
-        return reservationServicesMap.getOrDefault(reservationId, new ArrayList<>());
-    }
-
-    public double calculateAdditionalCost(String reservationId) {
-        double total = 0;
-        List<AddOnService> services = reservationServicesMap.getOrDefault(reservationId, new ArrayList<>());
-
-        for (AddOnService service : services) {
-            total += service.getServiceCost();
+    // Adds a confirmed reservation to the history
+    public void addReservation(Reservation reservation) {
+        if (reservation != null) {
+            history.add(reservation);
+            System.out.println("System: Reservation added to history -> " + reservation);
         }
-
-        return total;
     }
 
-    public double calculateFinalCost(Reservation reservation) {
-        return reservation.getBaseCost() + calculateAdditionalCost(reservation.getReservationId());
+    /**
+     * Retrieves stored reservations.
+     * CRITICAL: Returns an unmodifiable view of the list.
+     * This ensures that reporting services can read the data, but cannot
+     * modify, add, or delete historical records (Audit Trail Integrity).
+     */
+    public List<Reservation> getHistory() {
+        return Collections.unmodifiableList(history);
     }
+}
 
-    public void displayServicesForReservation(String reservationId) {
-        List<AddOnService> services = getServicesForReservation(reservationId);
+// 3. Booking Report Service: Focuses ONLY on reading and summarizing data
+class BookingReportService {
 
-        if (services.isEmpty()) {
-            System.out.println("No add-on services selected for reservation " + reservationId);
+    // Generates a chronological audit trail
+    public void printAuditTrail(List<Reservation> reservations) {
+        System.out.println("\n--- AUDIT TRAIL: CHRONOLOGICAL BOOKING HISTORY ---");
+        if (reservations.isEmpty()) {
+            System.out.println("No bookings found.");
             return;
         }
 
-        System.out.println("Add-on services for reservation " + reservationId + ":");
-        for (AddOnService service : services) {
-            System.out.println(service);
+        for (int i = 0; i < reservations.size(); i++) {
+            System.out.println((i + 1) + ". " + reservations.get(i));
         }
+        System.out.println("--------------------------------------------------");
+    }
+
+    // Generates a summary report without modifying data
+    public void printSummaryReport(List<Reservation> reservations) {
+        System.out.println("\n--- OPERATIONAL SUMMARY REPORT ---");
+        System.out.println("Total Confirmed Bookings: " + reservations.size());
+
+        double totalRevenue = 0;
+        for (Reservation res : reservations) {
+            totalRevenue += res.getPrice();
+        }
+
+        System.out.println("Total Revenue Generated: $" + totalRevenue);
+        System.out.println("----------------------------------");
     }
 }
 
+// 4. Admin Flow: Orchestrates the actors and tests the flow
 public class book {
     public static void main(String[] args) {
-        Reservation reservation1 = new Reservation("R101", "Sri", "Deluxe", 5000.0);
+        // Initialize the separate components
+        BookingHistory bookingHistory = new BookingHistory();
+        BookingReportService reportService = new BookingReportService();
 
-        AddOnService breakfast = new AddOnService("S01", "Breakfast", 500.0);
-        AddOnService airportPickup = new AddOnService("S02", "Airport Pickup", 1200.0);
-        AddOnService spa = new AddOnService("S03", "Spa Access", 1500.0);
+        System.out.println("=== 1. Simulating Booking Confirmations ===");
+        // Flow: A booking is successfully confirmed and added to history
+        bookingHistory.addReservation(new Reservation("B-1001", "Alice Smith", 150.00));
+        bookingHistory.addReservation(new Reservation("B-1002", "Bob Johnson", 220.50));
+        bookingHistory.addReservation(new Reservation("B-1003", "Charlie Davis", 95.00));
 
-        AddOnServiceManager serviceManager = new AddOnServiceManager();
+        System.out.println("\n=== 2. Admin Requests Reports ===");
+        // Flow: Admin requests information. Data is retrieved safely.
+        List<Reservation> historicalData = bookingHistory.getHistory();
 
-        serviceManager.addServiceToReservation("R101", breakfast);
-        serviceManager.addServiceToReservation("R101", airportPickup);
-        serviceManager.addServiceToReservation("R101", spa);
+        // Generate the audit trail (preserves insertion order)
+        reportService.printAuditTrail(historicalData);
 
-        System.out.println(reservation1);
-        serviceManager.displayServicesForReservation("R101");
+        // Generate the summary report
+        reportService.printSummaryReport(historicalData);
 
-        double additionalCost = serviceManager.calculateAdditionalCost("R101");
-        double finalCost = serviceManager.calculateFinalCost(reservation1);
-
-        System.out.println("Total Additional Cost: " + additionalCost);
-        System.out.println("Final Reservation Cost: " + finalCost);
+        /* * Testing the modification safeguard:
+         * If the Admin or ReportService tried to do: historicalData.add(...) or historicalData.clear()
+         * It would throw an UnsupportedOperationException, proving the data is secure.
+         */
     }
 }
