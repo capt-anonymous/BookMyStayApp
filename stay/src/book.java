@@ -1,145 +1,74 @@
+import java.io.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import java.util.*;
+class HotelState implements Serializable {
+    private static final long serialVersionUID = 1L;
+    Map<String, Integer> inventory;
+    List<String> bookingHistory;
 
-class Reservation {
-    private String reservationId;
-    private String guestName;
-    private String roomType;
-    private double baseCost;
-
-    public Reservation(String reservationId, String guestName, String roomType, double baseCost) {
-        this.reservationId = reservationId;
-        this.guestName = guestName;
-        this.roomType = roomType;
-        this.baseCost = baseCost;
-    }
-
-    public String getReservationId() {
-        return reservationId;
-    }
-
-    public String getGuestName() {
-        return guestName;
-    }
-
-    public String getRoomType() {
-        return roomType;
-    }
-
-    public double getBaseCost() {
-        return baseCost;
-    }
-
-    @Override
-    public String toString() {
-        return "Reservation ID: " + reservationId +
-                ", Guest: " + guestName +
-                ", Room Type: " + roomType +
-                ", Base Cost: " + baseCost;
+    public HotelState() {
+        inventory = new HashMap<>();
+        bookingHistory = new ArrayList<>();
+        inventory.put("SINGLE", 10);
+        inventory.put("DOUBLE", 5);
     }
 }
 
-class AddOnService {
-    private String serviceId;
-    private String serviceName;
-    private double serviceCost;
+class PersistenceService {
+    private static final String FILE_NAME = "hotel_data.ser";
 
-    public AddOnService(String serviceId, String serviceName, double serviceCost) {
-        this.serviceId = serviceId;
-        this.serviceName = serviceName;
-        this.serviceCost = serviceCost;
+    public void saveState(HotelState state) {
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(FILE_NAME))) {
+            oos.writeObject(state);
+            System.out.println("[PERSISTENCE] System state saved successfully to " + FILE_NAME);
+        } catch (IOException e) {
+            System.out.println("[ERROR] Failed to save state: " + e.getMessage());
+        }
     }
 
-    public String getServiceId() {
-        return serviceId;
-    }
-
-    public String getServiceName() {
-        return serviceName;
-    }
-
-    public double getServiceCost() {
-        return serviceCost;
-    }
-
-    @Override
-    public String toString() {
-        return serviceName + " (ID: " + serviceId + ", Cost: " + serviceCost + ")";
-    }
-}
-
-class AddOnServiceManager {
-    private Map<String, List<AddOnService>> reservationServicesMap;
-
-    public AddOnServiceManager() {
-        reservationServicesMap = new HashMap<>();
-    }
-
-    public void addServiceToReservation(String reservationId, AddOnService service) {
-        reservationServicesMap.putIfAbsent(reservationId, new ArrayList<>());
-        reservationServicesMap.get(reservationId).add(service);
-    }
-
-    public void addMultipleServicesToReservation(String reservationId, List<AddOnService> services) {
-        reservationServicesMap.putIfAbsent(reservationId, new ArrayList<>());
-        reservationServicesMap.get(reservationId).addAll(services);
-    }
-
-    public List<AddOnService> getServicesForReservation(String reservationId) {
-        return reservationServicesMap.getOrDefault(reservationId, new ArrayList<>());
-    }
-
-    public double calculateAdditionalCost(String reservationId) {
-        double total = 0;
-        List<AddOnService> services = reservationServicesMap.getOrDefault(reservationId, new ArrayList<>());
-
-        for (AddOnService service : services) {
-            total += service.getServiceCost();
+    public HotelState loadState() {
+        File file = new File(FILE_NAME);
+        if (!file.exists()) {
+            System.out.println("[PERSISTENCE] No saved state found. Starting with fresh defaults.");
+            return new HotelState();
         }
 
-        return total;
-    }
-
-    public double calculateFinalCost(Reservation reservation) {
-        return reservation.getBaseCost() + calculateAdditionalCost(reservation.getReservationId());
-    }
-
-    public void displayServicesForReservation(String reservationId) {
-        List<AddOnService> services = getServicesForReservation(reservationId);
-
-        if (services.isEmpty()) {
-            System.out.println("No add-on services selected for reservation " + reservationId);
-            return;
-        }
-
-        System.out.println("Add-on services for reservation " + reservationId + ":");
-        for (AddOnService service : services) {
-            System.out.println(service);
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(FILE_NAME))) {
+            HotelState state = (HotelState) ois.readObject();
+            System.out.println("[PERSISTENCE] System state recovered from " + FILE_NAME);
+            return state;
+        } catch (IOException | ClassNotFoundException e) {
+            System.out.println("[ERROR] Recovery failed (file may be corrupted). Starting fresh.");
+            return new HotelState();
         }
     }
 }
 
-public class book {
+public class UseCase12DataPersistenceRecovery {
     public static void main(String[] args) {
-        Reservation reservation1 = new Reservation("R101", "Sri", "Deluxe", 5000.0);
+        PersistenceService persistence = new PersistenceService();
+        
+        System.out.println("=== Phase 1: Application Startup & Recovery ===");
+        HotelState currentState = persistence.loadState();
+        
+        System.out.println("Current Inventory: " + currentState.inventory);
+        System.out.println("Current History: " + currentState.bookingHistory);
 
-        AddOnService breakfast = new AddOnService("S01", "Breakfast", 500.0);
-        AddOnService airportPickup = new AddOnService("S02", "Airport Pickup", 1200.0);
-        AddOnService spa = new AddOnService("S03", "Spa Access", 1500.0);
+        System.out.println("\n=== Phase 2: Processing New Transactions ===");
+        if (currentState.inventory.get("SINGLE") > 0) {
+            String newBooking = "Guest_" + (currentState.bookingHistory.size() + 1) + " booked SINGLE";
+            currentState.bookingHistory.add(newBooking);
+            currentState.inventory.put("SINGLE", currentState.inventory.get("SINGLE") - 1);
+            System.out.println("[ACTION] Processed: " + newBooking);
+        }
 
-        AddOnServiceManager serviceManager = new AddOnServiceManager();
-
-        serviceManager.addServiceToReservation("R101", breakfast);
-        serviceManager.addServiceToReservation("R101", airportPickup);
-        serviceManager.addServiceToReservation("R101", spa);
-
-        System.out.println(reservation1);
-        serviceManager.displayServicesForReservation("R101");
-
-        double additionalCost = serviceManager.calculateAdditionalCost("R101");
-        double finalCost = serviceManager.calculateFinalCost(reservation1);
-
-        System.out.println("Total Additional Cost: " + additionalCost);
-        System.out.println("Final Reservation Cost: " + finalCost);
+        System.out.println("\n=== Phase 3: System Shutdown & Persistence ===");
+        System.out.println("Updated Inventory: " + currentState.inventory);
+        persistence.saveState(currentState);
+        
+        System.out.println("\n[INFO] Try running the program again to see the data persist!");
     }
 }
