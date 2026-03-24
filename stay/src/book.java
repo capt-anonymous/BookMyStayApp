@@ -1,145 +1,143 @@
-
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Stack;
 
 class Reservation {
-    private String reservationId;
+    private String bookingId;
     private String guestName;
     private String roomType;
-    private double baseCost;
+    private String roomId;
+    private boolean cancelled;
 
-    public Reservation(String reservationId, String guestName, String roomType, double baseCost) {
-        this.reservationId = reservationId;
+    public Reservation(String bookingId, String guestName, String roomType, String roomId) {
+        this.bookingId = bookingId;
         this.guestName = guestName;
         this.roomType = roomType;
-        this.baseCost = baseCost;
+        this.roomId = roomId;
+        this.cancelled = false;
     }
 
-    public String getReservationId() {
-        return reservationId;
-    }
-
-    public String getGuestName() {
-        return guestName;
-    }
-
-    public String getRoomType() {
-        return roomType;
-    }
-
-    public double getBaseCost() {
-        return baseCost;
-    }
-
-    @Override
-    public String toString() {
-        return "Reservation ID: " + reservationId +
-                ", Guest: " + guestName +
-                ", Room Type: " + roomType +
-                ", Base Cost: " + baseCost;
-    }
+    public String getBookingId() { return bookingId; }
+    public String getRoomType() { return roomType; }
+    public String getRoomId() { return roomId; }
+    public boolean isCancelled() { return cancelled; }
+    public void setCancelled(boolean cancelled) { this.cancelled = cancelled; }
 }
 
-class AddOnService {
-    private String serviceId;
-    private String serviceName;
-    private double serviceCost;
+class InventoryManager {
+    private Map<String, Integer> availableCounts;
+    private Stack<String> releasedRoomIds;
 
-    public AddOnService(String serviceId, String serviceName, double serviceCost) {
-        this.serviceId = serviceId;
-        this.serviceName = serviceName;
-        this.serviceCost = serviceCost;
+    public InventoryManager() {
+        availableCounts = new HashMap<>();
+        availableCounts.put("SINGLE", 5);
+        availableCounts.put("DOUBLE", 3);
+        releasedRoomIds = new Stack<>();
     }
 
-    public String getServiceId() {
-        return serviceId;
+    public boolean checkAvailability(String type) {
+        return availableCounts.getOrDefault(type, 0) > 0;
     }
 
-    public String getServiceName() {
-        return serviceName;
+    public void allocate(String type) {
+        availableCounts.put(type, availableCounts.get(type) - 1);
     }
 
-    public double getServiceCost() {
-        return serviceCost;
+    public void rollback(String type, String roomId) {
+        availableCounts.put(type, availableCounts.get(type) + 1);
+        releasedRoomIds.push(roomId);
     }
 
-    @Override
-    public String toString() {
-        return serviceName + " (ID: " + serviceId + ", Cost: " + serviceCost + ")";
-    }
-}
-
-class AddOnServiceManager {
-    private Map<String, List<AddOnService>> reservationServicesMap;
-
-    public AddOnServiceManager() {
-        reservationServicesMap = new HashMap<>();
-    }
-
-    public void addServiceToReservation(String reservationId, AddOnService service) {
-        reservationServicesMap.putIfAbsent(reservationId, new ArrayList<>());
-        reservationServicesMap.get(reservationId).add(service);
-    }
-
-    public void addMultipleServicesToReservation(String reservationId, List<AddOnService> services) {
-        reservationServicesMap.putIfAbsent(reservationId, new ArrayList<>());
-        reservationServicesMap.get(reservationId).addAll(services);
-    }
-
-    public List<AddOnService> getServicesForReservation(String reservationId) {
-        return reservationServicesMap.getOrDefault(reservationId, new ArrayList<>());
-    }
-
-    public double calculateAdditionalCost(String reservationId) {
-        double total = 0;
-        List<AddOnService> services = reservationServicesMap.getOrDefault(reservationId, new ArrayList<>());
-
-        for (AddOnService service : services) {
-            total += service.getServiceCost();
+    public String getReusedRoomId() {
+        if (!releasedRoomIds.isEmpty()) {
+            return releasedRoomIds.pop();
         }
+        return null;
+    }
+    
+    public void printState() {
+        System.out.println("  Inventory Counts: " + availableCounts);
+        System.out.println("  Released Rooms Stack (LIFO): " + releasedRoomIds);
+    }
+}
 
-        return total;
+class BookingSystem {
+    private InventoryManager inventory;
+    private Map<String, Reservation> history;
+    private int idCounter = 1;
+
+    public BookingSystem() {
+        inventory = new InventoryManager();
+        history = new HashMap<>();
     }
 
-    public double calculateFinalCost(Reservation reservation) {
-        return reservation.getBaseCost() + calculateAdditionalCost(reservation.getReservationId());
+    public String book(String guest, String type) {
+        if (!inventory.checkAvailability(type)) {
+            System.out.println("[FAILED] No " + type + " rooms available for " + guest);
+            return null;
+        }
+        
+        inventory.allocate(type);
+        
+        String reusedId = inventory.getReusedRoomId();
+        String roomId = (reusedId != null) ? reusedId : (type + "-10" + idCounter);
+        String bookingId = "BKG-" + idCounter++;
+        
+        Reservation res = new Reservation(bookingId, guest, type, roomId);
+        history.put(bookingId, res);
+        
+        System.out.println("[BOOKED] " + guest + " booked " + type + ". Booking ID: " + bookingId + " | Room ID: " + roomId);
+        return bookingId;
     }
 
-    public void displayServicesForReservation(String reservationId) {
-        List<AddOnService> services = getServicesForReservation(reservationId);
-
-        if (services.isEmpty()) {
-            System.out.println("No add-on services selected for reservation " + reservationId);
+    public void cancel(String bookingId) {
+        Reservation res = history.get(bookingId);
+        
+        if (res == null) {
+            System.out.println("[CANCEL ERROR] Booking ID " + bookingId + " does not exist.");
             return;
         }
-
-        System.out.println("Add-on services for reservation " + reservationId + ":");
-        for (AddOnService service : services) {
-            System.out.println(service);
+        if (res.isCancelled()) {
+            System.out.println("[CANCEL ERROR] Booking ID " + bookingId + " is already cancelled.");
+            return;
         }
+        
+        res.setCancelled(true);
+        inventory.rollback(res.getRoomType(), res.getRoomId());
+        System.out.println("[CANCELLED] Booking " + bookingId + " successfully cancelled. Room " + res.getRoomId() + " pushed to rollback stack.");
+    }
+    
+    public void printInventoryState() {
+        inventory.printState();
     }
 }
 
-public class book {
+public class UseCase10BookingCancellation {
     public static void main(String[] args) {
-        Reservation reservation1 = new Reservation("R101", "Sri", "Deluxe", 5000.0);
-
-        AddOnService breakfast = new AddOnService("S01", "Breakfast", 500.0);
-        AddOnService airportPickup = new AddOnService("S02", "Airport Pickup", 1200.0);
-        AddOnService spa = new AddOnService("S03", "Spa Access", 1500.0);
-
-        AddOnServiceManager serviceManager = new AddOnServiceManager();
-
-        serviceManager.addServiceToReservation("R101", breakfast);
-        serviceManager.addServiceToReservation("R101", airportPickup);
-        serviceManager.addServiceToReservation("R101", spa);
-
-        System.out.println(reservation1);
-        serviceManager.displayServicesForReservation("R101");
-
-        double additionalCost = serviceManager.calculateAdditionalCost("R101");
-        double finalCost = serviceManager.calculateFinalCost(reservation1);
-
-        System.out.println("Total Additional Cost: " + additionalCost);
-        System.out.println("Final Reservation Cost: " + finalCost);
+        BookingSystem system = new BookingSystem();
+        
+        System.out.println("=== 1. Initial Bookings ===");
+        String b1 = system.book("Alice", "SINGLE");
+        String b2 = system.book("Bob", "DOUBLE");
+        String b3 = system.book("Charlie", "SINGLE");
+        
+        System.out.println("\n=== 2. State Before Cancellations ===");
+        system.printInventoryState();
+        
+        System.out.println("\n=== 3. Processing Cancellations ===");
+        system.cancel(b2);
+        system.cancel(b1);
+        system.cancel("BKG-999");
+        system.cancel(b2);
+        
+        System.out.println("\n=== 4. State After Cancellations ===");
+        system.printInventoryState();
+        
+        System.out.println("\n=== 5. New Bookings (Demonstrating Stack LIFO Reuse) ===");
+        system.book("Diana", "SINGLE");
+        system.book("Eve", "DOUBLE");
+        
+        System.out.println("\n=== 6. Final System State ===");
+        system.printInventoryState();
     }
 }
